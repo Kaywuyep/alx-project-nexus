@@ -3,6 +3,7 @@ from django.core.validators import MinValueValidator, MaxValueValidator
 from django.core.exceptions import ValidationError
 from cloudinary.models import CloudinaryField
 from users.models import User
+# from reviews.models import Review
 
 
 class Category(models.Model):

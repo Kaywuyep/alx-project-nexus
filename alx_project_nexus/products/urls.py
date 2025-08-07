@@ -1,6 +1,6 @@
 from django.urls import path
 from . import views
-from . import product_views  # Import function-based views
+# from . import product_views  # Import function-based views
 
 
 urlpatterns = [

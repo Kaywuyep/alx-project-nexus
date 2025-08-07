@@ -59,23 +59,26 @@ class ProductListSerializer(serializers.ModelSerializer):
             'average_rating', 'is_in_stock', 'created_at'
         ]
 
+    # def get_primary_image(self, obj):
+    #     primary_image = obj.images.filter(is_primary=True).first()
+    #     if primary_image:
+    #         return {
+    #             'id': primary_image.id,
+    #             'url': primary_image.image.url,
+    #             'alt_text': primary_image.alt_text
+    #         }
+    #     # Return first image if no primary image
+    #     first_image = obj.images.first()
+    #     if first_image:
+    #         return {
+    #             'id': first_image.id,
+    #             'url': first_image.image.url,
+    #             'alt_text': first_image.alt_text
+    #         }
+    #     return None
     def get_primary_image(self, obj):
-        primary_image = obj.images.filter(is_primary=True).first()
-        if primary_image:
-            return {
-                'id': primary_image.id,
-                'url': primary_image.image.url,
-                'alt_text': primary_image.alt_text
-            }
-        # Return first image if no primary image
-        first_image = obj.images.first()
-        if first_image:
-            return {
-                'id': first_image.id,
-                'url': first_image.image.url,
-                'alt_text': first_image.alt_text
-            }
-        return None
+        image = obj.images.filter(is_primary=True).first() or obj.images.first()
+        return ProductImageSerializer(image).data if image else None
 
 
 class ProductDetailSerializer(serializers.ModelSerializer):
@@ -142,7 +145,6 @@ class ProductCreateSerializer(serializers.ModelSerializer):
         child=serializers.ImageField(),
         write_only=True,
         required=False,
-        help_text="List of images to upload"
     )
 
     class Meta:

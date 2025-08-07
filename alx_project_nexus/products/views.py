@@ -258,6 +258,66 @@ class ProductDetailView(generics.RetrieveUpdateDestroyAPIView):
         }, status=status.HTTP_204_NO_CONTENT)
 
 
+# class ProductImageUploadView(APIView):
+#     """
+#     Upload additional images to existing product
+#     """
+#     permission_classes = [IsOwnerOrAdmin]
+#     parser_classes = [MultiPartParser, FormParser]
+
+#     @extend_schema(
+#         summary="Upload product images",
+#         description="Upload additional images to an existing product",
+#         request={
+#             'multipart/form-data': {
+#                 'type': 'object',
+#                 'properties': {
+#                     'images': {'type': 'array', 'items': {'type': 'string', 'format': 'binary'}},
+#                     'is_primary': {'type': 'boolean'}
+#                 }
+#             }
+#         },
+#         responses={201: ProductImageSerializer(many=True)}
+#     )
+#     def post(self, request, product_id):
+#         try:
+#             product = Product.objects.get(id=product_id)
+
+#             # Check permissions
+#             if not (request.user.is_admin or product.user == request.user):
+#                 return Response({
+#                     'error': 'Permission denied'
+#                 }, status=status.HTTP_403_FORBIDDEN)
+
+#             uploaded_files = request.FILES.getlist('images')
+#             is_primary = request.data.get('is_primary', False)
+
+#             if not uploaded_files:
+#                 return Response({
+#                     'error': 'No images provided'
+#                 }, status=status.HTTP_400_BAD_REQUEST)
+
+#             created_images = []
+#             for i, image_file in enumerate(uploaded_files):
+#                 image = ProductImage.objects.create(
+#                     product=product,
+#                     image=image_file,
+#                     is_primary=(is_primary and i == 0),
+#                     alt_text=f"{product.name} image"
+#                 )
+#                 created_images.append(image)
+
+#             return Response({
+#                 'message': f'{len(created_images)} images uploaded successfully',
+#                 'images': ProductImageSerializer(created_images, many=True).data
+#             }, status=status.HTTP_201_CREATED)
+
+#         except Product.DoesNotExist:
+#             return Response({
+#                 'error': 'Product not found'
+#             }, status=status.HTTP_404_NOT_FOUND)
+
+
 class ProductImageUploadView(APIView):
     """
     Upload additional images to existing product
@@ -272,7 +332,8 @@ class ProductImageUploadView(APIView):
             'multipart/form-data': {
                 'type': 'object',
                 'properties': {
-                    'images': {'type': 'array', 'items': {'type': 'string', 'format': 'binary'}},
+                    'image': {'type': 'string', 'format': 'binary'},  # Single image
+                    'images': {'type': 'array', 'items': {'type': 'string', 'format': 'binary'}},  # Multiple images
                     'is_primary': {'type': 'boolean'}
                 }
             }
@@ -289,13 +350,23 @@ class ProductImageUploadView(APIView):
                     'error': 'Permission denied'
                 }, status=status.HTTP_403_FORBIDDEN)
 
-            uploaded_files = request.FILES.getlist('images')
-            is_primary = request.data.get('is_primary', False)
+            # Handle both single image and multiple images
+            uploaded_files = []
+
+            # Check for single image upload (from frontend)
+            if 'image' in request.FILES:
+                uploaded_files.append(request.FILES['image'])
+
+            # Check for multiple images upload
+            if 'images' in request.FILES:
+                uploaded_files.extend(request.FILES.getlist('images'))
 
             if not uploaded_files:
                 return Response({
                     'error': 'No images provided'
                 }, status=status.HTTP_400_BAD_REQUEST)
+
+            is_primary = request.data.get('is_primary', False)
 
             created_images = []
             for i, image_file in enumerate(uploaded_files):
