@@ -92,5 +92,5 @@ The **ProDev Backend Engineering** program focuses on building scalable, secure,
 ---
 
 ## Author
-**CjATHERINE RINGBYEN WUYEP**  
+**CATHERINE RINGBYEN WUYEP**  
 ProDev Backend Engineering Program Learner  
