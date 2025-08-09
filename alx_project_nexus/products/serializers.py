@@ -45,6 +45,7 @@ class ProductListSerializer(serializers.ModelSerializer):
     """
     category_name = serializers.CharField(
         source='category.name', read_only=True)
+    images = serializers.SerializerMethodField()
     primary_image = serializers.SerializerMethodField()
     qty_left = serializers.ReadOnlyField()
     total_reviews = serializers.ReadOnlyField()
@@ -58,6 +59,13 @@ class ProductListSerializer(serializers.ModelSerializer):
             'primary_image', 'qty_left', 'total_reviews',
             'average_rating', 'is_in_stock', 'created_at'
         ]
+   
+    def get_images(self, obj):
+        return [img.image.url for img in obj.images.all()]
+    
+    def get_primary_image(self, obj):
+        primary = obj.images.filter(is_primary=True).first()
+        return primary.image.url if primary else None
 
     # def get_primary_image(self, obj):
     #     primary_image = obj.images.filter(is_primary=True).first()
@@ -76,9 +84,9 @@ class ProductListSerializer(serializers.ModelSerializer):
     #             'alt_text': first_image.alt_text
     #         }
     #     return None
-    def get_primary_image(self, obj):
-        image = obj.images.filter(is_primary=True).first() or obj.images.first()
-        return ProductImageSerializer(image).data if image else None
+    # def get_primary_image(self, obj):
+    #     image = obj.images.filter(is_primary=True).first() or obj.images.first()
+    #     return ProductImageSerializer(image).data if image else None
 
 
 class ProductDetailSerializer(serializers.ModelSerializer):
@@ -136,62 +144,119 @@ class ProductDetailSerializer(serializers.ModelSerializer):
         return attrs
 
 
+# class ProductCreateSerializer(serializers.ModelSerializer):
+#     """
+#     Product creation serializer
+#     """
+#     category_id = serializers.IntegerField()
+#     uploaded_images = serializers.ListField(
+#         child=serializers.ImageField(),
+#         write_only=True,
+#         required=False,
+#     )
+
+#     class Meta:
+#         model = Product
+#         fields = [
+#             'name', 'description', 'brand', 'category_id', 'sizes',
+#             'price', 'total_qty', 'uploaded_images'
+#         ]
+
+#     def validate_category_id(self, value):
+#         """Validate category exists"""
+#         if not Category.objects.filter(id=value).exists():
+#             raise serializers.ValidationError("Category does not exist")
+#         return value
+
+#     def validate_sizes(self, value):
+#         """Validate sizes"""
+#         valid_sizes = [choice[0] for choice in Product.SIZE_CHOICES]
+#         for size in value:
+#             if size not in valid_sizes:
+#                 raise serializers.ValidationError(
+#                     f"Invalid size: {size}. Valid sizes are: {', '.join(valid_sizes)}"
+#                 )
+#         return value
+
+#     @transaction.atomic
+#     def create(self, validated_data):
+#         """Create product with images"""
+#         uploaded_images = validated_data.pop('uploaded_images', [])
+#         category_id = validated_data.pop('category_id')
+
+#         # Set category and user
+#         validated_data['category_id'] = category_id
+#         validated_data['user'] = self.context['request'].user
+
+#         # Create product
+#         product = Product.objects.create(**validated_data)
+
+#         # Create images
+#         for i, image in enumerate(uploaded_images):
+#             ProductImage.objects.create(
+#                 product=product,
+#                 image=image,
+#                 is_primary=(i == 0),  # First image is primary
+#                 alt_text=f"{product.name} image {i+1}"
+#             )
+
+#         return product
+
+
 class ProductCreateSerializer(serializers.ModelSerializer):
-    """
-    Product creation serializer
-    """
-    category_id = serializers.IntegerField()
-    uploaded_images = serializers.ListField(
-        child=serializers.ImageField(),
-        write_only=True,
-        required=False,
-    )
+    category_id = serializers.IntegerField(write_only=True)
+    image = serializers.ImageField(required=False, write_only=True)
 
     class Meta:
         model = Product
         fields = [
-            'name', 'description', 'brand', 'category_id', 'sizes',
-            'price', 'total_qty', 'uploaded_images'
+            'name', 'description', 'brand', 'price', 
+            'category_id', 'sizes', 'total_qty', 'image'
         ]
 
     def validate_category_id(self, value):
-        """Validate category exists"""
         if not Category.objects.filter(id=value).exists():
-            raise serializers.ValidationError("Category does not exist")
+            raise serializers.ValidationError("Category does not exist.")
         return value
 
     def validate_sizes(self, value):
-        """Validate sizes"""
-        valid_sizes = [choice[0] for choice in Product.SIZE_CHOICES]
-        for size in value:
-            if size not in valid_sizes:
-                raise serializers.ValidationError(
-                    f"Invalid size: {size}. Valid sizes are: {', '.join(valid_sizes)}"
-                )
+        """Convert string to list if needed"""
+        if isinstance(value, str):
+            try:
+                import json
+                return json.loads(value)
+            except:
+                # If it's a comma-separated string
+                return [size.strip() for size in value.split(',') if size.strip()]
         return value
 
     @transaction.atomic
     def create(self, validated_data):
-        """Create product with images"""
-        uploaded_images = validated_data.pop('uploaded_images', [])
+        # Remove image from validated_data before creating product
+        image_file = validated_data.pop('image', None)
         category_id = validated_data.pop('category_id')
 
-        # Set category and user
-        validated_data['category_id'] = category_id
+        # Set the user (from request context)
         validated_data['user'] = self.context['request'].user
+        validated_data['category_id'] = category_id
 
-        # Create product
+        # Create the product
         product = Product.objects.create(**validated_data)
 
-        # Create images
-        for i, image in enumerate(uploaded_images):
-            ProductImage.objects.create(
-                product=product,
-                image=image,
-                is_primary=(i == 0),  # First image is primary
-                alt_text=f"{product.name} image {i+1}"
-            )
-
+        # Handle image upload if provided
+        if image_file:
+            try:
+                ProductImage.objects.create(
+                    product=product,
+                    image=image_file,
+                    is_primary=True,
+                    alt_text=f"{product.name} primary image"
+                )
+                print(f"✅ Image uploaded successfully for product {product.id}")
+            except Exception as e:
+                print(f"❌ Image upload failed: {str(e)}")
+                # Don't fail the entire transaction, just log the error
+   
         return product
 
 

@@ -14,10 +14,17 @@ import os
 from pathlib import Path
 from decouple import config
 import dj_database_url
+import cloudinary
+import cloudinary.uploader
+import cloudinary.api
+import logging
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+# Configure logging to see what's happening with uploads
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
@@ -80,7 +87,7 @@ ROOT_URLCONF = 'alx_project_nexus.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [BASE_DIR / 'templates'],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -175,25 +182,135 @@ USE_TZ = True
 STATIC_URL = 'static/'
 STATIC_ROOT = os.path.join(BASE_DIR, 'static/')
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
-TEMPLATES[0]['DIRS'] = [BASE_DIR / 'templates']
-# Media files configuration for production
-# if 'render' in os.environ:
-#     # Production settings for Render
-#     MEDIA_URL = '/media/'
-#     MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
-# else:
-#     # Local development
-#     MEDIA_URL = '/media/'
-#     MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+
+# ================================
+# CLOUDINARY CONFIGURATION
+# ================================
+
+# Simple and direct configuration using individual variables (most reliable)
+try:
+    # Get individual variables from .env
+    cloud_name = config('CLOUDINARY_CLOUD_NAME', default=None)
+    api_key = config('CLOUDINARY_API_KEY', default=None)
+    api_secret = config('CLOUDINARY_API_SECRET', default=None)
+    
+    logger.info(f"🔍 Found credentials - Cloud: {bool(cloud_name)}, Key: {bool(api_key)}, Secret: {bool(api_secret)}")
+    
+    if all([cloud_name, api_key, api_secret]):
+        # Configure Cloudinary directly
+        cloudinary.config(
+            secure=True,
+            cloud_name=cloud_name,
+            api_key=api_key,
+            api_secret=api_secret,
+        )
+        logger.info("✅ Cloudinary configured successfully!")
+        logger.info(f"🔗 Cloud name: {cloud_name}")
+        logger.info(f"🔑 API Key: {api_key[:6]}...")
+        
+    else:
+        missing = []
+        if not cloud_name: missing.append('CLOUDINARY_CLOUD_NAME')
+        if not api_key: missing.append('CLOUDINARY_API_KEY') 
+        if not api_secret: missing.append('CLOUDINARY_API_SECRET')
+        
+        logger.error(f"❌ Missing Cloudinary variables: {', '.join(missing)}")
+        logger.error("💡 Please check your .env file")
+        raise Exception(f"Missing required Cloudinary variables: {missing}")
+        
+except Exception as e:
+    logger.error(f"❌ Cloudinary configuration failed: {e}")
+    # Set minimal config to prevent crashes
+    cloudinary.config(secure=True)
+
+# Cloudinary Storage Settings
 CLOUDINARY_STORAGE = {
-    'CLOUD_NAME': config('CLOUDINARY_CLOUD_NAME'),
-    'API_KEY': config('CLOUDINARY_API_KEY'),
-    'API_SECRET': config('CLOUDINARY_API_SECRET'),
+    'CLOUD_NAME': config('CLOUDINARY_CLOUD_NAME', default=''),
+    'API_KEY': config('CLOUDINARY_API_KEY', default=''),
+    'API_SECRET': config('CLOUDINARY_API_SECRET', default=''),
 }
 
+# Set Cloudinary as the default file storage
 DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
+
+# File upload settings
+FILE_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024  # 10MB
+DATA_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024  # 10MB
+FILE_UPLOAD_PERMISSIONS = 0o644
+
+# ================================
+# LOGGING CONFIGURATION
+# ================================
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '{levelname} {asctime} {module} {process:d} {thread:d} {message}',
+            'style': '{',
+        },
+        'simple': {
+            'format': '{levelname} {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'simple',
+        },
+        'file': {
+            'class': 'logging.FileHandler',
+            'filename': BASE_DIR / 'django.log',
+            'formatter': 'verbose',
+        },
+    },
+    'loggers': {
+        'cloudinary': {
+            'handlers': ['console'],
+            'level': 'DEBUG',
+            'propagate': True,
+        },
+        'products.views': {
+            'handlers': ['console', 'file'],
+            'level': 'INFO',
+            'propagate': True,
+        },
+        'django.request': {
+            'handlers': ['console', 'file'],
+            'level': 'ERROR',
+            'propagate': True,
+        },
+    },
+    'root': {
+        'handlers': ['console'],
+        'level': 'INFO',
+    },
+}
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# ================================
+# ENVIRONMENT-SPECIFIC SETTINGS
+# ================================
+
+
+# Test Cloudinary connection on startup
+def test_cloudinary_connection():
+    """Test if Cloudinary is properly configured"""
+    try:
+        # Try to get account details
+        result = cloudinary.api.ping()
+        if result.get('status') == 'ok':
+            logger.info("🎉 Cloudinary connection successful!")
+            return True
+        else:
+            logger.warning("⚠️ Cloudinary ping returned unexpected status")
+            return False
+    except Exception as e:
+        logger.error(f"❌ Cloudinary connection test failed: {e}")
+        return False
