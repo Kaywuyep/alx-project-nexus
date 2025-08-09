@@ -54,13 +54,13 @@ class Order(models.Model):
     )
 
     total_price = models.DecimalField(
-        max_digits=10,
+        max_digits=30,
         decimal_places=2,
         default=0.00
     )
 
     currency = models.CharField(
-        max_length=10,
+        max_length=20,
         default="Not specified"
     )
 
