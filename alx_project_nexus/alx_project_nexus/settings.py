@@ -87,6 +87,10 @@ MIDDLEWARE = [
 #     "https://your-react-app.onrender.com",  # your deployed React frontend
 #     "http://localhost:3000",  # for local development
 # ]
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:3000",
+    "https://martafrica.onrender.com",
+]
 CORS_ALLOW_ALL_ORIGINS = True
 
 ROOT_URLCONF = 'alx_project_nexus.urls'
