@@ -50,8 +50,7 @@ class IsOwnerOrAdmin(permissions.BasePermission):
         
         return False
 
-
-# class IsAdminOrReadOnly(permissions.BasePermission):
+# class IsAdminAndReadOnly(permissions.BasePermission):
 #     """
 #     Custom permission to allow read-only access to all users,
 #     but write access only to admin users.
@@ -65,7 +64,8 @@ class IsOwnerOrAdmin(permissions.BasePermission):
 #             request.user.is_authenticated and 
 #             request.user.is_admin
 #         )
-        
+
+    
 class IsAdminOrReadOnly(permissions.BasePermission):
     """
     Custom permission to allow read-only access to all users,

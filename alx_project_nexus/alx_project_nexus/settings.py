@@ -17,6 +17,7 @@ import dj_database_url
 import cloudinary
 import cloudinary.uploader
 import cloudinary.api
+from datetime import timedelta
 import logging
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -34,6 +35,12 @@ SECRET_KEY = 'django-insecure-ot5x&g1va-&8wp9^0ga2!ag6^qap1!7g%vfu$t_y*pw2zsej4m
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
+
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=300),  # or whatever you want
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
+    # other settings...
+}
 
 # ALLOWED_HOSTS = []
 # allow all origins (not recommended for production)
