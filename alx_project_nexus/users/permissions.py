@@ -51,6 +51,21 @@ class IsOwnerOrAdmin(permissions.BasePermission):
         return False
 
 
+# class IsAdminOrReadOnly(permissions.BasePermission):
+#     """
+#     Custom permission to allow read-only access to all users,
+#     but write access only to admin users.
+#     """
+#     def has_permission(self, request, view):
+#         if request.method in permissions.SAFE_METHODS:
+#             return bool(request.user and request.user.is_authenticated)
+        
+#         return bool(
+#             request.user and 
+#             request.user.is_authenticated and 
+#             request.user.is_admin
+#         )
+        
 class IsAdminOrReadOnly(permissions.BasePermission):
     """
     Custom permission to allow read-only access to all users,
@@ -58,10 +73,10 @@ class IsAdminOrReadOnly(permissions.BasePermission):
     """
     def has_permission(self, request, view):
         if request.method in permissions.SAFE_METHODS:
-            return bool(request.user and request.user.is_authenticated)
-        
+            return True  # <-- allow anyone to read without auth
+
         return bool(
-            request.user and 
-            request.user.is_authenticated and 
+            request.user and
+            request.user.is_authenticated and
             request.user.is_admin
         )
