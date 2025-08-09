@@ -54,15 +54,16 @@ class ProductListSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Product
-        fields = [
-            'id', 'name', 'brand', 'category_name', 'price',
-            'primary_image', 'qty_left', 'total_reviews',
-            'average_rating', 'is_in_stock', 'created_at'
-        ]
-   
+        # fields = [
+        #     'id', 'name', 'brand', 'category_name', 'price',
+        #     'primary_image', 'qty_left', 'total_reviews', 'images',
+        #     'average_rating', 'is_in_stock', 'created_at'
+        # ]
+        fields = '__all__'
+
     def get_images(self, obj):
         return [img.image.url for img in obj.images.all()]
-    
+
     def get_primary_image(self, obj):
         primary = obj.images.filter(is_primary=True).first()
         return primary.image.url if primary else None
