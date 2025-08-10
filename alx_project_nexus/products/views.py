@@ -4,9 +4,10 @@ from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser
 from django_filters.rest_framework import DjangoFilterBackend
 from django_filters import rest_framework as django_filters
-from django.db.models import F
+from django.db.models import F, Q, Avg
 from drf_spectacular.utils import extend_schema, OpenApiResponse, OpenApiParameter
 from drf_spectacular.types import OpenApiTypes
+from django.core.paginator import Paginator
 from django.db import transaction
 import logging
 
@@ -16,6 +17,7 @@ from .serializers import (
     ProductUpdateSerializer, CategorySerializer,
     WishlistSerializer, ProductImageSerializer
 )
+from .serializers import ProductSearchSerializer, ProductSearchMinimalSerializer
 from users.permissions import IsAdminUser, IsOwnerOrAdmin, IsAdminOrReadOnly
 # type: ignore
 
@@ -88,112 +90,6 @@ class CategoryDetailView(generics.RetrieveUpdateDestroyAPIView):
         return super().get(request, *args, **kwargs)
 
 
-# class ProductListCreateView(generics.ListCreateAPIView):
-#     """
-#     List products or create new product
-#     """
-#     queryset = Product.objects.select_related('category', 'user').prefetch_related('images', 'reviews')
-#     permission_classes = [permissions.IsAuthenticated]
-#     filter_backends = [
-#         DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
-#     filterset_class = ProductFilterSet  # Changed from filterset_fields to filterset_class
-#     search_fields = ['name', 'description', 'brand']
-#     ordering_fields = ['price', 'created_at', 'average_rating', 'total_sold']
-#     ordering = ['-created_at']
-#     parser_classes = [MultiPartParser, FormParser]
-
-#     def get_serializer_class(self):
-#         if self.request.method == 'POST':
-#             return ProductCreateSerializer
-#         return ProductListSerializer
-
-#     def get_permissions(self):
-#         """
-#         Get list: Anyone can view
-#         Create: Only authenticated users (admin for now, can be changed)
-#         """
-#         if self.request.method == 'POST':
-#             return [IsAdminUser()]
-#         return [permissions.AllowAny()]
-
-#     def get_queryset(self):
-#         queryset = super().get_queryset()
-
-#         # Filter by price range
-#         min_price = self.request.query_params.get('min_price')
-#         max_price = self.request.query_params.get('max_price')
-
-#         if min_price:
-#             queryset = queryset.filter(price__gte=min_price)
-#         if max_price:
-#             queryset = queryset.filter(price__lte=max_price)
-
-#         # Filter by stock status
-#         in_stock = self.request.query_params.get('in_stock')
-#         if in_stock and in_stock.lower() == 'true':
-#             queryset = queryset.filter(total_qty__gt=F('total_sold'))
-
-#         # Filter by rating
-#         min_rating = self.request.query_params.get('min_rating')
-#         if min_rating:
-#             # This requires a complex annotation
-#             queryset = queryset.annotate(
-#                 avg_rating=Avg('reviews__rating')
-#             ).filter(avg_rating__gte=min_rating)
-
-#         return queryset
-
-#     @extend_schema(
-#         summary="List products",
-#         description="Get list of all products with filtering and search capabilities",
-#         parameters=[
-#             OpenApiParameter(
-#                 'category', OpenApiTypes.INT,
-#                 description='Filter by category ID'),
-#             OpenApiParameter(
-#                 'brand', OpenApiTypes.STR,
-#                 description='Filter by brand'),
-#             OpenApiParameter(
-#                 'sizes', OpenApiTypes.STR,
-#                 description='Filter by size (e.g., S, M, L, XL)'),
-#             OpenApiParameter(
-#                 'min_price', OpenApiTypes.NUMBER,
-#                 description='Minimum price filter'),
-#             OpenApiParameter(
-#                 'max_price', OpenApiTypes.NUMBER,
-#                 description='Maximum price filter'),
-#             OpenApiParameter(
-#                 'in_stock', OpenApiTypes.BOOL,
-#                 description='Filter products in stock'),
-#             OpenApiParameter(
-#                 'min_rating', OpenApiTypes.NUMBER,
-#                 description='Minimum rating filter'),
-#             OpenApiParameter(
-#                 'search', OpenApiTypes.STR,
-#                 description='Search in name, description, brand'),
-#         ],
-#         responses={200: ProductListSerializer(many=True)}
-#     )
-#     def get(self, request, *args, **kwargs):
-#         return super().get(request, *args, **kwargs)
-
-#     @extend_schema(
-#         summary="Create product (Admin only)",
-#         description="Create a new product with images - Admin access required",
-#         request=ProductCreateSerializer,
-#         responses={201: ProductDetailSerializer}
-#     )
-#     def post(self, request, *args, **kwargs):
-#         serializer = self.get_serializer(data=request.data)
-#         if serializer.is_valid():
-#             product = serializer.save()
-#             return Response({
-#                 'message': 'Product created successfully',
-#                 'product': ProductDetailSerializer(product).data
-#             }, status=status.HTTP_201_CREATED)
-#         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-
 class ProductDetailView(generics.RetrieveUpdateDestroyAPIView):
     """
     Get, update or delete product
@@ -260,137 +156,6 @@ class ProductDetailView(generics.RetrieveUpdateDestroyAPIView):
         return Response({
             'message': 'Product deleted successfully'
         }, status=status.HTTP_204_NO_CONTENT)
-
-
-# class ProductImageUploadView(APIView):
-#     """
-#     Upload additional images to existing product
-#     """
-#     permission_classes = [IsOwnerOrAdmin]
-#     parser_classes = [MultiPartParser, FormParser]
-
-#     @extend_schema(
-#         summary="Upload product images",
-#         description="Upload additional images to an existing product",
-#         request={
-#             'multipart/form-data': {
-#                 'type': 'object',
-#                 'properties': {
-#                     'images': {'type': 'array', 'items': {'type': 'string', 'format': 'binary'}},
-#                     'is_primary': {'type': 'boolean'}
-#                 }
-#             }
-#         },
-#         responses={201: ProductImageSerializer(many=True)}
-#     )
-#     def post(self, request, product_id):
-#         try:
-#             product = Product.objects.get(id=product_id)
-
-#             # Check permissions
-#             if not (request.user.is_admin or product.user == request.user):
-#                 return Response({
-#                     'error': 'Permission denied'
-#                 }, status=status.HTTP_403_FORBIDDEN)
-
-#             uploaded_files = request.FILES.getlist('images')
-#             is_primary = request.data.get('is_primary', False)
-
-#             if not uploaded_files:
-#                 return Response({
-#                     'error': 'No images provided'
-#                 }, status=status.HTTP_400_BAD_REQUEST)
-
-#             created_images = []
-#             for i, image_file in enumerate(uploaded_files):
-#                 image = ProductImage.objects.create(
-#                     product=product,
-#                     image=image_file,
-#                     is_primary=(is_primary and i == 0),
-#                     alt_text=f"{product.name} image"
-#                 )
-#                 created_images.append(image)
-
-#             return Response({
-#                 'message': f'{len(created_images)} images uploaded successfully',
-#                 'images': ProductImageSerializer(created_images, many=True).data
-#             }, status=status.HTTP_201_CREATED)
-
-#         except Product.DoesNotExist:
-#             return Response({
-#                 'error': 'Product not found'
-#             }, status=status.HTTP_404_NOT_FOUND)
-
-
-# class ProductImageUploadView(APIView):
-#     """
-#     Upload additional images to existing product
-#     """
-#     permission_classes = [IsOwnerOrAdmin]
-#     parser_classes = [MultiPartParser, FormParser]
-
-#     @extend_schema(
-#         summary="Upload product images",
-#         description="Upload additional images to an existing product",
-#         request={
-#             'multipart/form-data': {
-#                 'type': 'object',
-#                 'properties': {
-#                     'image': {'type': 'string', 'format': 'binary'},  # Single image
-#                     'images': {'type': 'array', 'items': {'type': 'string', 'format': 'binary'}},  # Multiple images
-#                     'is_primary': {'type': 'boolean'}
-#                 }
-#             }
-#         },
-#         responses={201: ProductImageSerializer(many=True)}
-#     )
-#     def post(self, request, product_id):
-#         try:
-#             product = Product.objects.get(id=product_id)
-
-#             # Check permissions
-#             if not (request.user.is_admin or product.user == request.user):
-#                 return Response({
-#                     'error': 'Permission denied'
-#                 }, status=status.HTTP_403_FORBIDDEN)
-
-#             # Handle both single image and multiple images
-#             uploaded_files = []
-
-#             # Check for single image upload (from frontend)
-#             if 'image' in request.FILES:
-#                 uploaded_files.append(request.FILES['image'])
-
-#             # Check for multiple images upload
-#             if 'images' in request.FILES:
-#                 uploaded_files.extend(request.FILES.getlist('images'))
-
-#             if not uploaded_files:
-#                 return Response({
-#                     'error': 'No images provided'
-#                 }, status=status.HTTP_400_BAD_REQUEST)
-
-#             is_primary = request.data.get('is_primary', False)
-
-#             created_images = []
-#             for i, image_file in enumerate(uploaded_files):
-#                 image = ProductImage.objects.create(
-#                     product=product,
-#                     image=image_file,
-#                     is_primary=(is_primary and i == 0),
-#                     alt_text=f"{product.name} image"
-#                 )
-#                 created_images.append(image)
-
-#             return Response({
-#                 'message': f'{len(created_images)} images uploaded successfully',
-#                 'images': ProductImageSerializer(created_images, many=True).data
-#             }, status=status.HTTP_201_CREATED)
-
-#         except Product.DoesNotExist:
-#             return Response({
-#                 'error': 'Product not found'
-#             }, status=status.HTTP_404_NOT_FOUND)
 
 
 class ProductListCreateView(generics.ListCreateAPIView):
@@ -535,6 +300,207 @@ class ProductImageUploadView(APIView):
                 'error': 'Unexpected error occurred',
                 'detail': str(e)
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class ProductSearchView(generics.ListAPIView):
+    """
+    Advanced product search with multiple filters and sorting options
+
+    Query Parameters:
+    - q: Search query (searches name, description, brand)
+    - category: Category ID or name
+    - brand: Brand name
+    - min_price: Minimum price
+    - max_price: Maximum price
+    - sizes: Comma-separated sizes (e.g., "S,M,L")
+    - in_stock: Filter by stock availability (true/false)
+    - sort: Sorting option (price_asc, price_desc, newest, oldest, rating, popular)
+    - page: Page number for pagination
+    - page_size: Items per page (default: 20, max: 100)
+    - minimal: Return minimal data for faster loading (true/false)
+    """
+
+    def get_serializer_class(self):
+        if self.request.query_params.get('minimal', '').lower() == 'true':
+            return ProductSearchMinimalSerializer
+        return ProductSearchSerializer
+
+    def get_queryset(self):
+        queryset = Product.objects.select_related('category', 'user').prefetch_related(
+            'images', 'reviews'
+        )
+
+        # Search query
+        query = self.request.query_params.get('q', '')
+        if query:
+            queryset = queryset.filter(
+                Q(name__icontains=query) |
+                Q(description__icontains=query) |
+                Q(brand__icontains=query) |
+                Q(category__name__icontains=query)
+            )
+
+        # Category filter
+        category = self.request.query_params.get('category', '')
+        if category:
+            if category.isdigit():
+                queryset = queryset.filter(category_id=category)
+            else:
+                queryset = queryset.filter(category__name__icontains=category)
+
+        # Brand filter
+        brand = self.request.query_params.get('brand', '')
+        if brand:
+            queryset = queryset.filter(brand__icontains=brand)
+
+        # Price filters
+        min_price = self.request.query_params.get('min_price', '')
+        if min_price:
+            try:
+                queryset = queryset.filter(price__gte=float(min_price))
+            except ValueError:
+                pass
+
+        max_price = self.request.query_params.get('max_price', '')
+        if max_price:
+            try:
+                queryset = queryset.filter(price__lte=float(max_price))
+            except ValueError:
+                pass
+
+        # Size filter
+        sizes = self.request.query_params.get('sizes', '')
+        if sizes:
+            size_list = [size.strip().upper() for size in sizes.split(',')]
+            # Filter products that have any of the requested sizes
+            for size in size_list:
+                queryset = queryset.filter(sizes__contains=[size])
+
+        # Stock filter
+        in_stock = self.request.query_params.get('in_stock', '')
+        if in_stock.lower() == 'true':
+            # Filter products where total_qty > total_sold
+            queryset = queryset.filter(total_qty__gt=F('total_sold'))
+        elif in_stock.lower() == 'false':
+            # Filter products where total_qty <= total_sold
+            queryset = queryset.filter(total_qty__lte=F('total_sold'))
+
+        return queryset
+
+    def get_sorted_queryset(self, queryset):
+        """Apply sorting to queryset"""
+        sort_param = self.request.query_params.get('sort', 'newest')
+
+        if sort_param == 'price_asc':
+            return queryset.order_by('price')
+        elif sort_param == 'price_desc':
+            return queryset.order_by('-price')
+        elif sort_param == 'oldest':
+            return queryset.order_by('created_at')
+        elif sort_param == 'newest':
+            return queryset.order_by('-created_at')
+        elif sort_param == 'rating':
+            # Sort by average rating (requires annotation)
+            return queryset.annotate(
+                avg_rating=Avg('reviews__rating')
+            ).order_by('-avg_rating', '-created_at')
+        elif sort_param == 'popular':
+            # Sort by total sold
+            return queryset.order_by('-total_sold', '-created_at')
+        elif sort_param == 'name_asc':
+            return queryset.order_by('name')
+        elif sort_param == 'name_desc':
+            return queryset.order_by('-name')
+        else:
+            return queryset.order_by('-created_at')
+
+    def list(self, request, *args, **kwargs):
+        try:
+            queryset = self.get_queryset()
+            queryset = self.get_sorted_queryset(queryset)
+
+            # Get page size (default 20, max 100)
+            page_size = min(int(request.query_params.get('page_size', 20)), 100)
+            page_number = int(request.query_params.get('page', 1))
+
+            # Paginate results
+            paginator = Paginator(queryset, page_size)
+            page = paginator.get_page(page_number)
+
+            # Serialize data
+            serializer = self.get_serializer(page.object_list, many=True)
+
+            # Prepare response with metadata
+            response_data = {
+                'results': serializer.data,
+                'pagination': {
+                    'current_page': page.number,
+                    'total_pages': paginator.num_pages,
+                    'total_items': paginator.count,
+                    'page_size': page_size,
+                    'has_next': page.has_next(),
+                    'has_previous': page.has_previous(),
+                    'next_page': page.next_page_number() if page.has_next() else None,
+                    'previous_page': page.previous_page_number() if page.has_previous() else None,
+                },
+                'filters_applied': {
+                    'query': request.query_params.get('q', ''),
+                    'category': request.query_params.get('category', ''),
+                    'brand': request.query_params.get('brand', ''),
+                    'min_price': request.query_params.get('min_price', ''),
+                    'max_price': request.query_params.get('max_price', ''),
+                    'sizes': request.query_params.get('sizes', ''),
+                    'in_stock': request.query_params.get('in_stock', ''),
+                    'sort': request.query_params.get('sort', 'newest'),
+                }
+            }
+
+            return Response(response_data, status=status.HTTP_200_OK)
+
+        except ValueError as e:
+            return Response(
+                {'error': 'Invalid parameter value', 'detail': str(e)},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        except Exception as e:
+            return Response(
+                {'error': 'Search failed', 'detail': str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+class ProductSearchSuggestionsView(generics.ListAPIView):
+    """
+    Get search suggestions based on partial query
+    """
+
+    def get(self, request, *args, **kwargs):
+        query = request.query_params.get('q', '')
+        if len(query) < 2:
+            return Response({'suggestions': []})
+
+        # Get product name suggestions
+        name_suggestions = Product.objects.filter(
+            name__icontains=query
+        ).values_list('name', flat=True).distinct()[:5]
+
+        # Get brand suggestions
+        brand_suggestions = Product.objects.filter(
+            brand__icontains=query
+        ).values_list('brand', flat=True).distinct()[:5]
+
+        # Get category suggestions
+        category_suggestions = Category.objects.filter(
+            name__icontains=query
+        ).values_list('name', flat=True).distinct()[:5]
+
+        suggestions = {
+            'products': list(name_suggestions),
+            'brands': list(brand_suggestions),
+            'categories': list(category_suggestions),
+        }
+
+        return Response({'suggestions': suggestions})
 
 
 class WishlistView(generics.ListCreateAPIView):

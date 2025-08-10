@@ -145,65 +145,6 @@ class ProductDetailSerializer(serializers.ModelSerializer):
         return attrs
 
 
-# class ProductCreateSerializer(serializers.ModelSerializer):
-#     """
-#     Product creation serializer
-#     """
-#     category_id = serializers.IntegerField()
-#     uploaded_images = serializers.ListField(
-#         child=serializers.ImageField(),
-#         write_only=True,
-#         required=False,
-#     )
-
-#     class Meta:
-#         model = Product
-#         fields = [
-#             'name', 'description', 'brand', 'category_id', 'sizes',
-#             'price', 'total_qty', 'uploaded_images'
-#         ]
-
-#     def validate_category_id(self, value):
-#         """Validate category exists"""
-#         if not Category.objects.filter(id=value).exists():
-#             raise serializers.ValidationError("Category does not exist")
-#         return value
-
-#     def validate_sizes(self, value):
-#         """Validate sizes"""
-#         valid_sizes = [choice[0] for choice in Product.SIZE_CHOICES]
-#         for size in value:
-#             if size not in valid_sizes:
-#                 raise serializers.ValidationError(
-#                     f"Invalid size: {size}. Valid sizes are: {', '.join(valid_sizes)}"
-#                 )
-#         return value
-
-#     @transaction.atomic
-#     def create(self, validated_data):
-#         """Create product with images"""
-#         uploaded_images = validated_data.pop('uploaded_images', [])
-#         category_id = validated_data.pop('category_id')
-
-#         # Set category and user
-#         validated_data['category_id'] = category_id
-#         validated_data['user'] = self.context['request'].user
-
-#         # Create product
-#         product = Product.objects.create(**validated_data)
-
-#         # Create images
-#         for i, image in enumerate(uploaded_images):
-#             ProductImage.objects.create(
-#                 product=product,
-#                 image=image,
-#                 is_primary=(i == 0),  # First image is primary
-#                 alt_text=f"{product.name} image {i+1}"
-#             )
-
-#         return product
-
-
 class ProductCreateSerializer(serializers.ModelSerializer):
     category_id = serializers.IntegerField(write_only=True)
     image = serializers.ImageField(required=False, write_only=True)
@@ -292,6 +233,74 @@ class ProductUpdateSerializer(serializers.ModelSerializer):
 
         instance.save()
         return instance
+
+
+class ProductSearchSerializer(serializers.ModelSerializer):
+    # Include virtual properties
+    qty_left = serializers.ReadOnlyField()
+    total_reviews = serializers.ReadOnlyField()
+    average_rating = serializers.ReadOnlyField()
+    is_in_stock = serializers.ReadOnlyField()
+    is_low_stock = serializers.ReadOnlyField()
+    
+    # Include related data
+    category = CategorySerializer(read_only=True)
+    images = ProductImageSerializer(many=True, read_only=True)
+    primary_image = serializers.SerializerMethodField()
+    
+    # User information (limited for security)
+    seller_name = serializers.CharField(source='user.fullname', read_only=True)
+    seller_id = serializers.IntegerField(source='user.id', read_only=True)
+
+    class Meta:
+        model = Product
+        fields = [
+            'id', 'name', 'description', 'brand', 'category', 'sizes',
+            'price', 'total_qty', 'total_sold', 'qty_left', 'total_reviews',
+            'average_rating', 'is_in_stock', 'is_low_stock', 'created_at',
+            'updated_at', 'images', 'primary_image', 'seller_name', 'seller_id'
+        ]
+
+    def get_primary_image(self, obj):
+        """Get the primary image or first image if no primary is set"""
+        primary_image = obj.images.filter(is_primary=True).first()
+        if not primary_image:
+            primary_image = obj.images.first()
+        
+        if primary_image:
+            return ProductImageSerializer(primary_image).data
+        return None
+
+
+class ProductSearchMinimalSerializer(serializers.ModelSerializer):
+    """Minimal serializer for faster search results"""
+    category_name = serializers.CharField(source='category.name', read_only=True)
+    primary_image = serializers.SerializerMethodField()
+    qty_left = serializers.ReadOnlyField()
+    average_rating = serializers.ReadOnlyField()
+    is_in_stock = serializers.ReadOnlyField()
+
+    class Meta:
+        model = Product
+        fields = [
+            'id', 'name', 'brand', 'category_name', 'price', 
+            'qty_left', 'average_rating', 'is_in_stock', 
+            'primary_image', 'created_at'
+        ]
+
+    def get_primary_image(self, obj):
+        """Get just the image URL for primary image"""
+        primary_image = obj.images.filter(is_primary=True).first()
+        if not primary_image:
+            primary_image = obj.images.first()
+        
+        if primary_image:
+            return {
+                'id': primary_image.id,
+                'image': primary_image.image.url if primary_image.image else None,
+                'alt_text': primary_image.alt_text
+            }
+        return None
 
 
 class WishlistSerializer(serializers.ModelSerializer):

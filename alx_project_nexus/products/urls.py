@@ -1,6 +1,5 @@
 from django.urls import path
 from . import views
-# from . import product_views  # Import function-based views
 
 
 urlpatterns = [
@@ -16,14 +15,12 @@ urlpatterns = [
     # Wishlist endpoints
     path('wishlist/', views.WishlistView.as_view(), name='wishlist'),
     path('wishlist/<int:id>/', views.WishlistDetailView.as_view(), name='wishlist-detail'),
+    
+    path('search/', views.ProductSearchView.as_view(), name='product-search'),
+    # Search suggestions endpoint
+    path('search/suggestions/', views.ProductSearchSuggestionsView.as_view(), name='search-suggestions'),
 
     # Admin endpoints
     path('admin/stats/', views.AdminProductStatsView.as_view(), name='admin-product-stats'),
     path('admin/low-stock/', views.AdminLowStockView.as_view(), name='admin-low-stock'),
-
-    # Function-based views
-    # path('products/', product_views.get_products_function, name='products-list'),
-    # path('product/<int:product_id>/', product_views.get_product_detail_function, name='product-detail'),
-    # path('product/create/', product_views.create_product_function, name='create-product'),
-    # path('product/wishlist/', product_views.user_wishlist_function, name='wishlist'),
 ]
