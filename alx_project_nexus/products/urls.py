@@ -9,7 +9,7 @@ urlpatterns = [
 
     # Product endpoints (Class-based views)
     path('products/', views.ProductListCreateView.as_view(), name='product-list-create'),
-    path('productsp/<int:id>/', views.ProductDetailView.as_view(), name='product-detail'),
+    path('products/<int:id>/', views.ProductDetailView.as_view(), name='product-detail'),
     path('<int:product_id>/images/', views.ProductImageUploadView.as_view(), name='product-image-upload'),
 
     # Wishlist endpoints
