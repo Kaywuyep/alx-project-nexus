@@ -1,96 +1,164 @@
-# ALX Project Nexus
+# MART AFRICA - ALX-PROJECT-NEXUS
+- **Overview**
+This is my final project
 
-## Overview
-This repository documents my major learnings from the **ProDev Backend Engineering** program. It is a personal knowledge hub showcasing backend engineering concepts, tools, frameworks, and best practices I have mastered.  
+- **Setup Django**
+```bash
+python -m venv venv  # create a virtuel environment
+pip install -r requirements.txt  # install all requirements need for this project
+# these are the commands i used to setup the project
+django-admin startproject mart_africa
+python manage.py startapp users  # for my user auth and management
+python manage.py startapp products  # for products management
+python manage.py startapp orders # for order management
+python manage.py startapp reviews
+# Test Db
+python manage.py dbshell
+python manage.py collectstatic
+```
 
-The **ProDev Backend Engineering** program focuses on building scalable, secure, and performant backend systems using modern technologies like Python, Django, REST APIs, GraphQL, and containerization with Docker. It also covers advanced topics such as asynchronous programming, database design, caching strategies, and DevOps principles.
+#### Project Structure 
+- **mart_africa/**
+- ├── requirements.txt
+- ├── .env
+- |-- README.md
+- ├── mart_africa/
+- │   ├── settings.py
+- │   └── urls.py
+- └── apps/
+-    ├── accounts/     # User authentication
+-   ├── products/     # Product management
+-    ├── orders/       # Order processing
+-   └── categories/     # Category handling
 
----
+- Install drf-yasg for Swagger documentation.
+Configure Swagger to automatically document all APIs. The documentation should be available at /swagger/.
 
-## Key Technologies Covered
-- **Python** – Core backend programming language used for building business logic and APIs.
-- **Django** – A high-level, batteries-included web framework for building scalable backend applications.
-- **Django REST Framework (DRF)** – Toolkit for building robust and well-documented RESTful APIs.
-- **GraphQL** – A flexible query language for APIs, offering clients precise control over data fetching.
-- **Celery** – Distributed task queue for asynchronous job execution and background processing.
-- **Docker** – Containerization platform ensuring consistent development and production environments.
-- **Kubernetes (K8s)** – Orchestration of containers at scale for high availability and auto-scaling.
-- **CI/CD (Continuous Integration & Continuous Deployment)** – Automating testing, building, and deployment pipelines.
+#### Users App Features
 
----
+###### 1. Models Created
 
-## Important Backend Development Concepts
-### 1. Database Design & Management
-- **Relational Databases (PostgreSQL, MySQL):**
-  - Learned normalization, relationships (one-to-many, many-to-many), and indexing for optimized queries.
-  - Explored database migrations using **Django ORM**.
-  - Understood database transactions, ACID properties, and data consistency.
-- **Database Optimization:**
-  - Implemented **query optimization**, **caching**, and **pagination** for better performance.
+- User Model extending Django's AbstractUser
+- ShippingAddress Model with one-to-one relationship
+- Automatic has_shipping_address flag update
+- Clean database relationships
+###### 2. Virtual Properties
 
-### 2. Asynchronous Programming
-- Learned how **async I/O** can handle thousands of concurrent requests.
-- Built async tasks using **Celery** and **Redis/RabbitMQ** as message brokers.
-- Applied async views in Django using `async def` for non-blocking operations.
+- User registration with password validation
+- JWT login/logout with custom claims
+- Token refresh functionality
+- Password change endpoint
+- Secure authentication using Django's built-in features
+###### 3. API Endpoints
+``` http
+- **Public Endpoints**
+POST /api/register/          # User registration
+POST /api/login/             # User login
+POST /api/refresh/     # Refresh JWT token
+```
+- **👤 Regular User Endpoints:**
+```http
+GET  /api/dashboard/         # User personal dashboard
+POST /api/logout/            # User logout
+GET/PATCH /api/profile/      # User profile management
+POST /api/change-password/   # Change password
+GET/POST/PATCH /api/shipping-address/  # Shipping address CRUD
+```
+- **🛡️ Admin-Only Endpoints:**
+```http
+GET  /api/admin/dashboard/           # Admin system dashboard
+GET  /api/admin/users/               # List all users
+GET/PATCH/DELETE  /api/admin/users/{id}/          # Get user details CRUD
+```
 
-### 3. Caching Strategies
-- Leveraged **Redis** as a caching layer to reduce database load.
-- Used **low-level caching** (e.g., caching querysets or computed values) and **view-level caching**.
-- Implemented **cache invalidation** techniques for dynamic content.
+###### 4. Role-Based Features:
+- **📊 Admin Dashboard:**
 
-### 4. Background Processing with Celery
-- Configured **Celery with Django** for:
-  - Sending emails asynchronously (e.g., booking confirmation).
-  - Scheduling periodic tasks with **Celery Beat**.
-  - Executing long-running tasks without blocking the main application.
-- Integrated Celery monitoring using **Flower**.
+- Total users count
+- Admin vs regular users statistics
+- Users with shipping addresses
+- Recent user registrations
+- Full system overview
 
-### 5. Containerization and Orchestration
-- **Docker:** Built containerized development environments with `Dockerfile` and `docker-compose`.
-- **Kubernetes:** Deployed microservices on Kubernetes clusters using YAML manifests, services, and deployments. Configured secrets, ConfigMaps, and Ingress controllers for production-like setups.
+- **👤 Regular User Dashboard:**
 
----
+- Personal profile information
+- Profile completion status
+- Personal statistics (orders, wishlist - ready for expansion)
+- User-specific data only
 
-## Challenges Faced and Solutions Implemented
-- **Challenge:** Optimizing database performance for heavy queries.  
-  **Solution:** Introduced query optimization, added appropriate indexes, and implemented caching (Redis).
+#### 🛍️ Products App Features
 
-- **Challenge:** Building scalable asynchronous systems.  
-  **Solution:** Integrated Celery and RabbitMQ for distributed task processing.
+###### 1. Models Created
 
-- **Challenge:** Managing environment differences between development and production.  
-  **Solution:** Adopted **Docker** for containerization and ensured consistent configurations using `docker-compose`.
+- **Product** – Main product model with all virtual properties  
+- **Category** – Product categories  
+- **ProductImage** – Multiple images per product using Cloudinary    
+- **Wishlist** – User wishlist functionality  
 
-- **Challenge:** Automating builds, tests, and deployments.  
-  **Solution:** Set up **CI/CD pipelines** using GitHub Actions to run automated tests (Pytest) and deploy to staging/production.
+###### 2. Virtual Properties
 
-- **Challenge:** Container orchestration and Kubernetes setup.  
-**Solution:** Deployed services on **Kubernetes** by writing manifests for deployments, services, and ingress, while learning to debug pods and manage scaling.
+- ✅ `qty_left` – `total_qty - total_sold`  
+- ✅ `total_reviews` – Count of reviews  
+- ✅ `average_rating` – Average rating from reviews  
+- ✅ `is_in_stock` – Stock availability check  
+- ✅ `is_low_stock` – Low stock warning  
 
----
+###### 3. Image Upload Features
 
-## Best Practices and Personal Takeaways
-- **Code Quality:** Writing clean, modular, and maintainable code using **PEP8** and type hints.
-- **Testing:** Implemented unit and integration tests using **Pytest** and **unittest**, ensuring code reliability.
-- **API Design:** Adhering to REST and GraphQL design principles with proper versioning, pagination, and error handling.
-- **Security:** Applied security best practices such as environment variable management, HTTPS, and input validation.
-- **Performance Optimization:** Learned when to use caching, async processing, and database optimizations for scalability.
-- **DevOps Mindset:** Embraced automation (Docker + CI/CD) to reduce manual overhead and increase deployment speed.
-- Deploying applications using **Docker + Kubernetes** with production-ready configurations.
+- Cloudinary integration with automatic transformations  
+- Multiple images per product with primary image designation  
+- Image compression and format optimization  
+- Alt text for accessibility  
 
----
+###### 4. API Endpoints
 
-## A Few Tools and Libraries I Got To Use
-- **Celery + RabbitMQ/Redis** – Asynchronous task queues.
-- **Swagger/OpenAPI** – API documentation.
-- **Postman** – API testing.
-- **Docker Compose** – Orchestrating multi-container applications.
-- **Kubernetes (kubectl, Helm)** – For container orchestration and deployment.
-- **Gunicorn + Nginx** – Production-ready deployment stack.
-- **Graphene-Django** – GraphQL integration with Django.
+##### 📦 Products
+```http
+GET    /api/products/                     # List products (with filters)
+POST   /api/products/                     # Create product (Admin)
+GET    /api/products/{id}/                # Get product details
+PATCH  /api/products/{id}/                # Update product (Owner/Admin)
+DELETE /api/products/{id}/                # Delete product (Owner/Admin)
+POST   /api/products/{id}/images/         # Upload additional images
+```
 
----
+##### Catregories
+```http
+GET    /api/products/categories/          # List categories
+POST   /api/products/categories/          # Create category (Admin)
+GET    /api/products/categories/{id}/     # Get category details
+```
+##### ❤️ Wishlist
+```http
+GET    /api/products/wishlist/            # Get user wishlist
+POST   /api/products/wishlist/            # Add to wishlist
+DELETE /api/products/wishlist/{id}/       # Remove from wishlist
+```
 
-## Author
-**CATHERINE RINGBYEN WUYEP**  
-ProDev Backend Engineering Program Learner  
+##### 🛡️ Admin Endpoints
+```http
+GET    /api/products/admin/stats/         # Product statistics
+GET    /api/products/admin/low-stock/     # Low stock products
+```
+#### Reviews App Features
+
+###### 1. Models
+- **Review** – Product reviews with ratings
+
+###### 2. API Endpoints
+```http
+GET   /api/{id}/reviews
+POST  /product/{id}/reviews
+```
+
+#### SWAGGER DOCUMENTAION
+```http
+GET /swagger       # web UI 
+GET /swagger-docs  # to download the documentation 
+```
+on my live hosting
+```http
+https://martafrica.onrender.com/swagger/
+https://martafrica.onrender.com/swagger-docs/
+```
